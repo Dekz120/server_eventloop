@@ -1,5 +1,4 @@
-#ifndef NODE_INCLUDED
-#define NODE_INCLUDED
+#pragma once
 
 #include <iostream>
 #include <sys/socket.h>
@@ -17,8 +16,8 @@ class serverExcept : public std::exception
 {
 public:
     serverExcept(){};
-    serverExcept(std::string&& es) : err(errno), error_source(std::move(es)){};
-    const char * what() const noexcept override
+    serverExcept(std::string &&es) : err(errno), error_source(std::move(es)){};
+    const char *what() const noexcept override
     {
         return error_source.c_str();
     }
@@ -31,17 +30,15 @@ class Node
 private:
     size_t fd;
     bool active;
+
 public:
     Node(size_t);
     Node();
-    Node(Node&&);
+    Node(Node &&);
     bool is_active();
     void closeConnection();
     size_t getFd();
     void setFd(int);
-    virtual int handleConnection()=0;
+    virtual int handleConnection();
     virtual ~Node();
-
 };
-
-#endif //NODE_INCLUDED

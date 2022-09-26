@@ -1,16 +1,14 @@
-#ifndef SERVER_INCLUDED
-#define SERVER_INCLUDED
+#pragma once
 
 #include "node.hpp"
 
 class Server : public Node
 {
-    private:
-        sockaddr_in addr;
-    public:
-        Server(size_t);
-        Server(Server&&);
-        int handleConnection() override;
-};
+private:
+    sockaddr_in addr;
 
-#endif //SERVER_INCLUDED
+public:
+    Server(size_t);
+    Server(Server &&);
+    int handleConnection() override;
+};
