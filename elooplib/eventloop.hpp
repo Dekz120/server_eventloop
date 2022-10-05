@@ -17,10 +17,11 @@ namespace
 class EventLoop
 {
 private:
-    int maxPollfdPos;
-    std::queue<int> availablePos;
+    int max_pollfd_pos;
+    std::queue<int> available_pos;
     std::vector<pollfd> fds;
-    std::list<std::pair<size_t, std::shared_ptr<Node>>> nodes; // pair <node, poll_position>
+    std::list<std::pair<size_t, std::shared_ptr<Node>>> nodes; //TODO no pair, just remove from vector
+    //ThreadPool th_pool; TODO
 public:
     EventLoop(size_t);
     void addNode(std::shared_ptr<Node> &, bool);

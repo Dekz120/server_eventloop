@@ -1,44 +1,42 @@
 #include "eventloop.hpp"
 
-EventLoop::EventLoop(size_t n_clients) : fds(n_clients), maxPollfdPos(0){};
+EventLoop::EventLoop(size_t n_clients) : fds(n_clients), max_pollfd_pos(0){};
 
 void EventLoop::addNode(std::shared_ptr<Node> &node, bool nonblock)
 {
     int p_pos;
 
-    if (availablePos.empty())
+    if (available_pos.empty())
     {
-        p_pos = maxPollfdPos++;
+        p_pos = max_pollfd_pos++;
     }
     else
     {
-        p_pos = availablePos.front();
-        availablePos.pop();
+        p_pos = available_pos.front();
+        available_pos.pop();
     }
 
     int fd = node->getFd();
 
     if (nonblock)
     {
-        int flags = fcntl(fd, F_GETFL, 0);
-        flags = (flags | O_NONBLOCK);
-        fcntl(fd, F_SETFL, flags);
+        fcntl(fd, F_SETFL, O_NONBLOCK);
     }
-
+    
     fds[p_pos].fd = fd;
     fds[p_pos].events = POLLIN;
-
+    fds[p_pos].revents = 0; //allows to avoid errors while reconnection
     nodes.push_back(std::make_pair(std::move(p_pos), node));
 }
 
 EventLoop::nodeRetType EventLoop::rmNode(nodeRetType &nodep)
 {
-    if (nodep->first == maxPollfdPos - 1 && availablePos.empty())
-        maxPollfdPos--;
+    if (nodep->first == max_pollfd_pos - 1 && available_pos.empty())
+        max_pollfd_pos--;
     else
-        availablePos.push(nodep->first);
+        available_pos.push(nodep->first);
 
-    fds[nodep->first].fd = -1;
+    fds[nodep->first].fd = -1; ///TODO remove it from vector
     nodep->first = -1;
 
     auto ret = nodes.erase(nodep);
@@ -67,9 +65,11 @@ int EventLoop::handleConnection(std::shared_ptr<Node> &hst)
 
 void EventLoop::run()
 {
+    //auto thread_pool = ThreadPool::getInstance(); TODO
     while (!stop)
     {
-        int rc = poll(fds.data(), maxPollfdPos, 0);
+        
+        int rc = poll(fds.data(), max_pollfd_pos, 0);
         if (rc < 0)
             throw serverExcept("poll()");
 
@@ -83,7 +83,7 @@ void EventLoop::run()
                 if (data > 0)
                 {
                     auto clnt = std::shared_ptr<Node>(new Client(data));
-                    addNode(clnt, 0); // TODO add nonblock support
+                    addNode(clnt, 1); 
                 }
                 if (!node->is_active())
                 {
@@ -93,6 +93,7 @@ void EventLoop::run()
         }
         std::signal(SIGINT, EventLoop::handleSignal);
     }
+    //thread_pool->stop(); TODO
 }
 
 void EventLoop::handleSignal(int signal)

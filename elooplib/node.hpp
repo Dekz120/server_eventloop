@@ -16,6 +16,7 @@ class serverExcept : public std::exception
 {
 public:
     serverExcept(){};
+    //TODO consider acception by argument
     serverExcept(std::string &&es) : err(errno), error_source(std::move(es)){};
     const char *what() const noexcept override
     {
