@@ -30,3 +30,8 @@ int Server::handleConnection()
         throw serverExcept("accept()");
     return (accept_sd);
 }
+
+size_t Server::getFd()
+{
+    Node::getFd();
+};

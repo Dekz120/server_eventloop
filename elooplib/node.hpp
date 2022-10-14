@@ -38,7 +38,7 @@ public:
     Node(Node &&);
     bool is_active();
     void closeConnection();
-    size_t getFd();
+    virtual size_t getFd();
     void setFd(int);
     virtual int handleConnection();
     virtual ~Node();

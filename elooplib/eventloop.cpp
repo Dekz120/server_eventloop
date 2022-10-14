@@ -1,6 +1,6 @@
 #include "eventloop.hpp"
 
-EventLoop::EventLoop(size_t n_clients) : fds(n_clients), max_pollfd_pos(0){};
+EventLoop::EventLoop(size_t n_clients) : fds(n_clients), max_pollfd_pos(0), th_pool(new ThreadPool(3)){};
 
 void EventLoop::addNode(std::shared_ptr<Node> &node, bool nonblock)
 {
@@ -22,22 +22,21 @@ void EventLoop::addNode(std::shared_ptr<Node> &node, bool nonblock)
     {
         fcntl(fd, F_SETFL, O_NONBLOCK);
     }
-    
+
     fds[p_pos].fd = fd;
     fds[p_pos].events = POLLIN;
-    fds[p_pos].revents = 0; //allows to avoid errors while reconnection
+    // fds[p_pos].revents = 0; //allows to avoid errors while reconnection
     nodes.push_back(std::make_pair(std::move(p_pos), node));
 }
 
-EventLoop::nodeRetType EventLoop::rmNode(nodeRetType &nodep)
+EventLoop::nodePointerType EventLoop::rmNode(nodePointerType &nodep)
 {
     if (nodep->first == max_pollfd_pos - 1 && available_pos.empty())
         max_pollfd_pos--;
     else
         available_pos.push(nodep->first);
 
-    fds[nodep->first].fd = -1; ///TODO remove it from vector
-    nodep->first = -1;
+    fds.erase(fds.begin() + nodep->first);
 
     auto ret = nodes.erase(nodep);
     return --ret;
@@ -63,37 +62,76 @@ int EventLoop::handleConnection(std::shared_ptr<Node> &hst)
     return -1;
 }
 
+EventLoop::nodePointerType EventLoop::waitersSearch(int fd)
+{
+    auto nodeComp = [&fd](nodeType &n)
+    {
+        return fd == n.second->getFd();
+    };
+    auto wp = find_if(begin(wait_q), end(wait_q), nodeComp);
+    return wp;
+}
+
+void EventLoop::blockClinet(nodePointerType &node_p)
+{
+    wait_q.push_back(std::move(*node_p));
+    node_p = nodes.erase(node_p);
+    --node_p;
+}
+
 void EventLoop::run()
 {
-    //auto thread_pool = ThreadPool::getInstance(); TODO
     while (!stop)
     {
-        
+
         int rc = poll(fds.data(), max_pollfd_pos, 0);
         if (rc < 0)
             throw serverExcept("poll()");
 
-        for (nodeRetType node_p = nodes.begin(); node_p != nodes.end(); node_p++)
+        for (nodePointerType node_p = nodes.begin(); node_p != nodes.end(); node_p++)
         {
-            auto &[pos, node] = *node_p;
+            auto [pos, node] = *node_p;
             if (fds[pos].revents == POLLIN)
             {
                 int data = handleConnection(node);
 
-                if (data > 0)
+                if (data > 0) // need to create a new Node/unblock waiting Node
                 {
-                    auto clnt = std::shared_ptr<Node>(new Client(data));
-                    addNode(clnt, 1); 
+                    auto wp = waitersSearch(data);
+                    if (wp != wait_q.end()) // There is a blocked Node where fd = data
+                    {
+                        nodes.push_back(std::move(*wp));
+                        wait_q.erase(wp);
+                    }
+                    else
+                    {
+                        auto tmp_ptr = std::dynamic_pointer_cast<Client>(node);
+                        if (tmp_ptr) // Client has returned new eventfd
+                        {
+                            auto clnt_task = std::shared_ptr<Node>(
+                                new ClientTask(data, *tmp_ptr, th_pool));
+
+                            addNode(clnt_task, 0);
+                            blockClinet(node_p);
+                            node = nullptr;
+                        }
+                        else // Server have got a new connection
+                        {
+                            auto clnt = std::shared_ptr<Node>(new Client(data));
+                            addNode(clnt, 1);
+                        }
+                    }
                 }
-                if (!node->is_active())
+                if (node) // check wheter node was moved
                 {
-                    node_p = rmNode(node_p);
+                    if (!node->is_active())
+                        node_p = rmNode(node_p);
                 }
             }
         }
         std::signal(SIGINT, EventLoop::handleSignal);
     }
-    //thread_pool->stop(); TODO
+    th_pool->stop();
 }
 
 void EventLoop::handleSignal(int signal)

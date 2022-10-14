@@ -5,24 +5,56 @@
 #include "threadpool.hpp"
 //#include "archive.hpp"
 
-enum class requestType{none, time, echo, compression};
-
 class Client : public Node
 {
 private:
     std::string request_field;
     std::string response;
 
-    std::atomic<int> files_counter;
 public:
     Client(int);
     Client(Client &&);
     int handleConnection() override;
-    void recognizeData();
-    void handleTime();
-    void handleEcho();
-    void handleCompress();
-    void compressFile(const std::string&); //TODO
+    size_t getFd() override;
+    int recognizeData();
+    int handleTime();
+    int handleEcho();
+    int handleCompress();
     
-    void sendData();
+    int sendData();
+    std::string getResponse();
+};
+
+class ClientTask : public Client
+{
+    public:
+    ClientTask(int, Client&, std::shared_ptr<ThreadPool>&);
+    ClientTask(ClientTask&& rhs);
+    int handleConnection() override;
+    void closeConnection();
+    int compressFiles();
+    size_t getFd() override;
+    ~ClientTask();
+    private:
+    std::shared_ptr<ThreadPool> th_pool;
+    std::string dir;
+    int event_fd;
+    std::atomic<int> complete_tasks{0};
+    std::atomic<int> success_tasks{0};
+};
+
+class CompressITask : public ITask
+{
+    public:
+    CompressITask(const std::string&, int, std::atomic<int>*, std::atomic<int>*, int);
+    int compressFile();
+    void run() override;
+    private:
+    std::string filename;
+    int event_fd;
+    std::atomic<int>* task_num;
+    std::atomic<int>* success;
+    int max;
+    
+
 };

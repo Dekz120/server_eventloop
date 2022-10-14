@@ -11,4 +11,5 @@ public:
     Server(size_t);
     Server(Server &&);
     int handleConnection() override;
+    size_t getFd() override;
 };
