@@ -14,10 +14,10 @@
 class ITask
 {
 public:
-    virtual void run(){};
-    ITask(){};
+    virtual void run()=0;
+    ITask() = default;
 
-    virtual ~ITask(){};
+    virtual ~ITask() = default;
 };
 
 class ThreadPool

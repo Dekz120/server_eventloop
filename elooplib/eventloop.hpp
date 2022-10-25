@@ -8,6 +8,7 @@
 #include "node.hpp"
 #include "server.hpp"
 #include "client.hpp"
+#include "client_task.hpp"
 
 namespace
 {
@@ -33,7 +34,7 @@ public:
     int handleConnection(std::shared_ptr<Node> &);
     void run();
     static void handleSignal(int);
-    
+
     nodePointerType waitersSearch(int);
-    void blockClinet(nodePointerType&);
+    void blockClinet(nodePointerType &);
 };

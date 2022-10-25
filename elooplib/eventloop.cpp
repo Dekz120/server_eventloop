@@ -1,6 +1,7 @@
 #include "eventloop.hpp"
 
-EventLoop::EventLoop(size_t n_clients) : fds(n_clients), max_pollfd_pos(0), th_pool(new ThreadPool(3)){};
+EventLoop::EventLoop(size_t n_clients) : fds(n_clients), max_pollfd_pos(0),
+                                         th_pool(new ThreadPool(3)){};
 
 void EventLoop::addNode(std::shared_ptr<Node> &node, bool nonblock)
 {
@@ -93,10 +94,10 @@ void EventLoop::run()
             auto [pos, node] = *node_p;
             if (fds[pos].revents == POLLIN)
             {
-                int data = handleConnection(node);
+                int data = handleConnection(node); // TODO WTF is data?
 
-                if (data > 0) // need to create a new Node/unblock waiting Node
-                {
+                if (data > 0) // TODO if need to use thread pool create eventFd(better in class)
+                {             // then i need to redefine Server handleConnection
                     auto wp = waitersSearch(data);
                     if (wp != wait_q.end()) // There is a blocked Node where fd = data
                     {
