@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <list>
 #include <queue>
+#include <memory>
 
 class serverExcept : public std::exception
 {
@@ -40,6 +41,6 @@ public:
     void closeConnection();
     virtual size_t getFd();
     void setFd(int);
-    virtual int handleConnection();
+    virtual std::shared_ptr<Node> handleConnection();
     virtual ~Node();
 };

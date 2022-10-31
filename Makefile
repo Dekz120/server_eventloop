@@ -5,7 +5,7 @@ INCLUDES =  ./elooplib/
 OBJECTS=$(SOURCES:.cpp=.o)
 
 CXX = g++
-CXXFLAGS = -std=c++2a -g -fsanitize=address -Wall -Wextra -Werror
+CXXFLAGS = -std=c++2a -g -fsanitize=address -Wall -Wextra #-Werror
 
 bvnserver: main.o eventloop.a
 	$(CXX) $(CXXFLAGS) -lz main.o eventloop.a -o $@
@@ -16,6 +16,9 @@ main.o: bvnServer/main.cpp $(INCLUDES)
 eventloop.a: $(OBJECTS) 
 	ar rcs eventloop.a $(OBJECTS)
 	
-eventloop.o: $(SOURCES) 
-	$(CXX) -c $(CXXFLAGS) elooplib/eventloop.cpp
+elooplib/%.o: %.cpp
+	$(CXX)  -c $(CXXFLAGS) -I$(INCLUDES) $?
+
+clean:
+	rm -f elooplib/*.o *.o *.a bvnserver
 

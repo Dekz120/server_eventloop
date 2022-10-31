@@ -1,14 +1,21 @@
-#include "client_task.hpp"
+#include "client.hpp"
 
-ClientTask::ClientTask(int fd, Client &cl, std::shared_ptr<ThreadPool> &tp)
-    : Client(cl.getFd()), th_pool(tp), event_fd(fd)
+ClientTask::ClientTask(int fd)
+    : Client(-1), th_pool(nullptr), event_fd(fd)
 {
-  dir = cl.getResponse();
-  ClientTask::prepareFileTask();
 }
 
 ClientTask::ClientTask(ClientTask &&rhs)
     : Client(static_cast<Client &&>(rhs)), th_pool(std::move(rhs.th_pool)) {}
+
+void ClientTask::attachData(std::shared_ptr<ThreadPool> &tp, std::shared_ptr<Client> &pc)
+{
+  th_pool = tp;
+  Client::setFd(pc->getFd());
+  dir = pc->Client::getResponse();
+  parentClient = pc;
+  ClientTask::prepareFileTask();
+}
 
 void ClientTask::prepareFileTask()
 {
@@ -62,7 +69,7 @@ void ClientTask::prepareFileTask()
                                 &success_tasks, task_summ));
         break;
       default:
-        ct == nullptr;
+        ct = nullptr;
         break;
       }
       if (ct)
@@ -71,15 +78,14 @@ void ClientTask::prepareFileTask()
   }
 }
 
-int ClientTask::handleConnection()
+std::shared_ptr<Node> ClientTask::handleConnection()
 {
   std::string resp = std::to_string(success_tasks) + "\n";
   int s = send(Node::getFd(), resp.c_str(), resp.size(), 0);
   if (s < 0)
     throw serverExcept("send()");
-  int parent_fd = Node::getFd();
   ClientTask::closeConnection();
-  return parent_fd;
+  return parentClient;
 }
 
 void ClientTask::closeConnection()

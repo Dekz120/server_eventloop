@@ -6,22 +6,22 @@ Client::Client(Client &&rhs)
       request_field(std::move(rhs.request_field)),
       response(std::move(rhs.response)) {}
 
-int Client::handleConnection()
+std::shared_ptr<Node> Client::handleConnection()
 {
   char buff[512];
-  size_t rcv;
+  int rcv;
 
   rcv = recv(getFd(), buff, 512, 0);
   if (rcv < 0)
   {
-    return -1;
+    return nullptr;
   }
   if (rcv == 0)
   {
     Node::closeConnection();
-    return 0;
+    return nullptr;
   }
-  int res = 0;
+  std::shared_ptr<Node> res = nullptr;
   if (rcv > 0)
   {
     request_field.append(buff, rcv);
@@ -37,7 +37,7 @@ int Client::handleConnection()
   return res;
 }
 
-int Client::recognizeData() // Codes should be : OK or LONG_OPERATION IN TH_POOL
+std::shared_ptr<Node> Client::recognizeData() // Codes should be : OK or LONG_OPERATION IN TH_POOL
 {
   if (response.starts_with("time\n"))
   {
@@ -60,21 +60,21 @@ int Client::recognizeData() // Codes should be : OK or LONG_OPERATION IN TH_POOL
   }
 }
 
-int Client::handleEcho()
+std::shared_ptr<Node> Client::handleEcho()
 {
   response = response.substr(5, request_field.size() - 5);
-  return 0;
+  return nullptr;
 }
 
-int Client::handleTime()
+std::shared_ptr<Node> Client::handleTime()
 {
   auto t = std::chrono::system_clock::now();
   auto tt = std::chrono::system_clock::to_time_t(t);
   response = std::ctime(&tt);
-  return 0;
+  return nullptr;
 }
 
-int Client::handleFileTask()
+std::shared_ptr<Node> Client::handleFileTask()
 {
   std::string dir_name;
   if (response.starts_with("compress "))
@@ -88,16 +88,17 @@ int Client::handleFileTask()
     return 0;
   }
   int fd = eventfd(0, EFD_CLOEXEC);
-  if (fd < 0) // TODO handle an error
+  if (fd < 0) 
   {
-    return 0;
+    return nullptr;
   }
-  return fd;
+  else
+    return std::shared_ptr<Node>(new ClientTask(fd));
 }
-int Client::sendData() // TODO Change return type to bool
+std::shared_ptr<Node> Client::sendData()
 {
-  int r = recognizeData();
-  if (r == 0)
+  auto r = recognizeData();
+  if (!r)
   {
     int s = send(getFd(), response.c_str(), response.size(), 0);
     if (s < 0)
@@ -106,7 +107,7 @@ int Client::sendData() // TODO Change return type to bool
   }
   else // functions requires a threadpool
   {
-    int s = send(getFd(), "Start compression...\n", 21, 0);
+    int s = send(getFd(), "File task in progress...\n", 26, 0);
     if (s < 0)
       throw serverExcept("send()");
     return r;

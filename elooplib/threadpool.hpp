@@ -23,7 +23,7 @@ public:
 class ThreadPool
 {
 public:
-    ThreadPool(size_t);
+    ThreadPool(size_t num_threads);
     ThreadPool(ThreadPool &) = delete;
     ThreadPool &operator=(ThreadPool &) = delete;
     ThreadPool(ThreadPool &&) = delete;

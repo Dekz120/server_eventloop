@@ -12,7 +12,7 @@ public:
   FileITask(const std::string &, int, std::atomic<int> *, std::atomic<int> *, int);
   int handleFile(const std::string &, const std::string &,
                  std::function<int(FILE *, FILE *, int)> &);
-  virtual int doWork(){};
+  virtual int doWork(){return 0;};
   void run() override;
   void closeTask();
 
