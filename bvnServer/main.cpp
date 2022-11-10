@@ -11,10 +11,9 @@ int main(int argc, char *argv[]) // 1th arg is a port
         return -1;
     }
     try
-    {
+    {  
         int tcp_port = std::stoi(argv[1]);
         auto srv = std::shared_ptr<Node>(new Server(tcp_port));
-
         EventLoop EL(max_clients);
         EL.addNode(srv, 1);
         EL.run();

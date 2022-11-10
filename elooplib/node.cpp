@@ -14,7 +14,7 @@ Node::~Node()
         close(fd);
 }
 
-int Node::handleConnection() { return 0; };
+std::shared_ptr<Node> Node::handleConnection() { return nullptr; };
 void Node::closeConnection()
 {
     active = 0;
