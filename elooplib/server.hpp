@@ -1,6 +1,6 @@
 #pragma once
 
-#include "node.hpp"
+#include "client.hpp"
 
 class Server : public Node
 {
@@ -10,5 +10,6 @@ private:
 public:
     Server(size_t);
     Server(Server &&);
-    int handleConnection() override;
+    std::shared_ptr<Node> handleConnection() override;
+    size_t getFd() override;
 };

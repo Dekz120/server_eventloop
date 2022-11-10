@@ -1,66 +1,171 @@
 #include "client.hpp"
 
-Client::Client(size_t descr) : Node(descr) {}
-Client::Client(Client &&rhs) : Node(static_cast<Node &&>(rhs)),
-                               request_field(std::move(rhs.request_field)) {}
+Client::Client(int descr) : Node(descr) {}
+Client::Client(Client &&rhs)
+    : Node(static_cast<Node &&>(rhs)),
+      request_field(std::move(rhs.request_field)),
+      response(std::move(rhs.response)) {}
 
-int Client::handleConnection()
+std::shared_ptr<Node> Client::handleConnection()
 {
-    char buff[512];
-    size_t rcv;
+  char buff[512];
+  int rcv;
 
-    rcv = recv(getFd(), buff, 512, 0);
+  rcv = recv(getFd(), buff, 512, 0);
+  if (rcv < 0)
+  {
+    return nullptr;
+  }
+  if (rcv == 0)
+  {
+    Node::closeConnection();
+    return nullptr;
+  }
+  std::shared_ptr<Node> res{nullptr};
+  if (rcv > 0)
+  {
+    bool gotReq = updateRequestField(buff, rcv);
+    if (gotReq)
+    {
+      parseCommand();
+      res = sendData();
+    }
+  }
+  return res;
+}
 
-    if (rcv < 0)
-    {
-        return -1;
-    }
-    if (rcv == 0)
-    {
-        Node::closeConnection();
-        return 0;
-    }
-    if (rcv > 0)
-    {
-        request_field.append(buff, rcv);
-        auto p = request_field.find('\n');
-        if (p != std::string::npos)
-        {
-
-            response = request_field.substr(0, p + 1);
-            sendData();
-            request_field.clear();
-        }
-    }
+bool Client::updateRequestField(const char *req, size_t len)
+{
+  request_field.append(req, len);
+  auto p = request_field.find('\n');
+  if (p != std::string::npos)
+  {
+    response = request_field.substr(0, p + 1);
+    if (p == request_field.size() - 1)
+      request_field.clear();
+    else
+      request_field = request_field.substr(p + 1, request_field.size() - p - 1);
+    return 1;
+  }
+  else
     return 0;
 }
 
-void Client::prepateData()
+void Client::parseCommand()
 {
-    if (response.substr(0, 5) == "time\n")
-        Client::prepareTime();
-    else if (response.substr(0, 5) == "echo ")
-        Client::prepareEcho();
-    else
-        response = "Wrong request\n";
+  if (response.starts_with("time\n"))
+  {
+    cmd.m_cmd = Command::Time;
+    cmd.m_arg.clear();
+    return;
+  }
+
+  if (response.starts_with("echo "))
+  {
+    cmd.m_cmd = Command::Echo;
+    cmd.m_arg = response.substr(5, response.size() - 5);
+    return;
+  }
+
+  if (response.starts_with("compress "))
+  {
+    cmd.m_cmd = Command::Compress;
+    cmd.m_arg = response.substr(9, response.size() - 10);
+    return;
+  }
+
+  if (response.starts_with("decompress "))
+  {
+    cmd.m_cmd = Command::Decompress;
+    cmd.m_arg = response.substr((11), response.size() - 12);
+    return;
+  }
+
+  else
+  {
+    cmd.m_cmd = Command::NotExitsts;
+  }
 }
 
-void Client::prepareEcho()
+std::shared_ptr<Node> Client::recognizeData() // Codes should be : OK or LONG_OPERATION IN TH_POOL
 {
-    response = response.substr(5, request_field.size() - 5);
+  if (cmd.m_cmd == Command::Time)
+  {
+    return Client::handleTime();
+  }
+
+  if (cmd.m_cmd == Command::Echo)
+  {
+    return Client::handleEcho();
+  }
+
+  if (cmd.m_cmd == Command::Compress || cmd.m_cmd == Command::Decompress)
+  {
+    return Client::handleFileTask();
+  }
+  else
+  {
+    response = "Wrong request\n";
+  }
+  return nullptr;
 }
 
-void Client::prepareTime()
+std::shared_ptr<Node> Client::handleEcho()
 {
-    auto t = std::chrono::system_clock::now();
-    auto tt = std::chrono::system_clock::to_time_t(t);
-    response = std::ctime(&tt);
+  response = cmd.m_arg;
+  return nullptr;
 }
 
-void Client::sendData()
+std::shared_ptr<Node> Client::handleTime()
 {
-    prepateData();
+  auto t = std::chrono::system_clock::now();
+  auto tt = std::chrono::system_clock::to_time_t(t);
+  response = std::ctime(&tt);
+  return nullptr;
+}
+
+std::shared_ptr<Node> Client::handleFileTask()
+{
+  std::string dir_name;
+  if (cmd.m_cmd == Command::Compress)
+    dir_name = cmd.m_arg;
+  else
+    dir_name = response.substr((11), response.size() - 12);
+  const std::filesystem::path dir(dir_name);
+  if (!exists(dir))
+  {
+    response = "Path is not exists\n";
+    return 0;
+  }
+  int fd = eventfd(0, EFD_CLOEXEC);
+  if (fd < 0)
+  {
+    return nullptr;
+  }
+  else
+    return std::shared_ptr<Node>(new ClientTask(fd));
+}
+std::shared_ptr<Node> Client::sendData()
+{
+  auto r = recognizeData();
+  if (!r)
+  {
     int s = send(getFd(), response.c_str(), response.size(), 0);
     if (s < 0)
-        throw serverExcept("send()");
+      throw serverExcept("send()");
+    cmd.clear();
+    response.clear();
+    return r;
+  }
+  else // functions requires a threadpool
+  {
+    int s = send(getFd(), "File task in progress...\n", 26, 0);
+    if (s < 0)
+      throw serverExcept("send()");
+    return r;
+  }
 }
+
+size_t Client::getFd() { return Node::getFd(); };
+
+std::string Client::getResponse() { return response; };

@@ -11,11 +11,13 @@
 #include <fcntl.h>
 #include <list>
 #include <queue>
+#include <memory>
 
 class serverExcept : public std::exception
 {
 public:
     serverExcept(){};
+    //TODO consider acception by argument
     serverExcept(std::string &&es) : err(errno), error_source(std::move(es)){};
     const char *what() const noexcept override
     {
@@ -37,8 +39,8 @@ public:
     Node(Node &&);
     bool is_active();
     void closeConnection();
-    size_t getFd();
+    virtual size_t getFd();
     void setFd(int);
-    virtual int handleConnection();
+    virtual std::shared_ptr<Node> handleConnection();
     virtual ~Node();
 };

@@ -1,0 +1,6 @@
+*.o
+*.a
+/bin
+.vscode
+bvnserver
+fileserver

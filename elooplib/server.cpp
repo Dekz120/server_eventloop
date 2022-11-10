@@ -23,10 +23,15 @@ Server::Server(size_t port) : Node()
 Server::Server(Server &&rhs) : Node(static_cast<Node &&>(rhs)),
                                addr(std::move(rhs.addr)){};
 
-int Server::handleConnection()
+std::shared_ptr<Node> Server::handleConnection()
 {
-    int accept_sd = accept(getFd(), (struct sockaddr *)&addr, (socklen_t *)&addr);
+    int accept_sd = accept(getFd(), (sockaddr *)&addr, (socklen_t *)&addr);
     if (accept_sd < 0)
         throw serverExcept("accept()");
-    return (accept_sd);
+    return std::shared_ptr<Node> (new Client(accept_sd));
 }
+
+size_t Server::getFd()
+{
+    return Node::getFd();
+};

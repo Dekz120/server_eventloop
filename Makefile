@@ -1,31 +1,24 @@
-LSOURCES= elooplib/node.cpp elooplib/server.cpp elooplib/client.cpp elooplib/eventloop.cpp
-SOURCES = bvnServer/main.cpp
-HEADERS = ./elooplib
+SOURCES = elooplib/archive.cpp elooplib/client_task.cpp elooplib/client.cpp\
+elooplib/eventloop.cpp elooplib/node.cpp elooplib/server.cpp elooplib/threadpool.cpp\
+elooplib/tp_tasks.cpp
+INCLUDES =  ./elooplib/
+OBJECTS=$(SOURCES:.cpp=.o)
 
 CXX = g++
-CXXFLAGS = -std=c++17 -g -Wall -Wextra #-Werror
-
-all: bvnserver clean
+CXXFLAGS = -std=c++2a -g -fsanitize=address -Wall -Wextra #-Werror
 
 bvnserver: main.o eventloop.a
-	$(CXX) $(CXXFLAGS) main.o eventloop.a -o bvnserver
+	$(CXX) $(CXXFLAGS) -lz main.o eventloop.a -o $@
 
-main.o: $(SOURCES)
-	$(CXX)  -c $(CXXFLAGS) -I./elooplib $(SOURCES) 
+main.o: bvnServer/main.cpp $(INCLUDES)
+	$(CXX)  -c $(CXXFLAGS) -I$(INCLUDES) bvnServer/main.cpp
 
-eventloop.a: eventloop.o client.o server.o node.o
-	ar rcs eventloop.a eventloop.o client.o server.o node.o
+eventloop.a: $(OBJECTS) 
+	ar rcs eventloop.a $(OBJECTS)
 	
-eventloop.o: 
-	$(CXX) -c $(CXXFLAGS)  $(LSOURCES)
-	
-client.o: 
-	$(CXX) -c $(CXXFLAGS)  elooplib/eventloop.cpp
-	
-server.o: 
-	$(CXX) -c $(CXXFLAGS)  elooplib/server.cpp
-node.o: 
-	$(CXX) -c $(CXXFLAGS)  elooplib/node.cpp
+elooplib/%.o: %.cpp
+	$(CXX)  -c $(CXXFLAGS) -I$(INCLUDES) $?
+
 clean:
-	rm *.o *.a bvnserver
+	rm -f elooplib/*.o *.o *.a bvnserver
 

@@ -1,51 +1,33 @@
 #include "eventloop.hpp"
 
-EventLoop::EventLoop(size_t n_clients) : fds(n_clients), maxPollfdPos(0){};
+EventLoop::EventLoop(size_t n_clients) : max_pollfd_pos(0), fds(n_clients),
+                                         nodes(n_clients, nullptr), th_pool(new ThreadPool(get_nprocs())){};
 
 void EventLoop::addNode(std::shared_ptr<Node> &node, bool nonblock)
 {
-    int p_pos;
-
-    if (availablePos.empty())
-    {
-        p_pos = maxPollfdPos++;
-    }
-    else
-    {
-        p_pos = availablePos.front();
-        availablePos.pop();
-    }
-
     int fd = node->getFd();
 
     if (nonblock)
     {
-        int flags = fcntl(fd, F_GETFL, 0);
-        flags = (flags | O_NONBLOCK);
-        fcntl(fd, F_SETFL, flags);
+        fcntl(fd, F_SETFL, O_NONBLOCK);
     }
 
-    fds[p_pos].fd = fd;
-    fds[p_pos].events = POLLIN;
-
-    nodes.push_back(std::make_pair(std::move(p_pos), node));
+    fds[max_pollfd_pos].fd = fd;
+    fds[max_pollfd_pos].events = POLLIN;
+    fds[max_pollfd_pos].revents = 0; // allows to avoid errors while reconnection
+    nodes[max_pollfd_pos] = node;
+    max_pollfd_pos++;
 }
 
-EventLoop::nodeRetType EventLoop::rmNode(nodeRetType &nodep)
+int EventLoop::rmNode(int indx)
 {
-    if (nodep->first == maxPollfdPos - 1 && availablePos.empty())
-        maxPollfdPos--;
-    else
-        availablePos.push(nodep->first);
-
-    fds[nodep->first].fd = -1;
-    nodep->first = -1;
-
-    auto ret = nodes.erase(nodep);
-    return --ret;
+    nodes.erase(nodes.begin() + indx);
+    fds.erase(fds.begin() + indx);
+    max_pollfd_pos--;
+    return --indx;
 }
 
-int EventLoop::handleConnection(std::shared_ptr<Node> &hst)
+std::shared_ptr<Node> EventLoop::handleConnection(std::shared_ptr<Node> &hst)
 {
     auto client_ptr = std::dynamic_pointer_cast<Client>(hst);
     if (client_ptr)
@@ -62,37 +44,47 @@ int EventLoop::handleConnection(std::shared_ptr<Node> &hst)
             return serv_ptr->handleConnection();
         }
     }
-    return -1;
+    return nullptr;
 }
 
 void EventLoop::run()
 {
     while (!stop)
     {
-        int rc = poll(fds.data(), maxPollfdPos, 0);
+
+        int rc = poll(fds.data(), max_pollfd_pos, 0);
         if (rc < 0)
             throw serverExcept("poll()");
 
-        for (nodeRetType node_p = nodes.begin(); node_p != nodes.end(); node_p++)
+        for (size_t pos = 0; pos < max_pollfd_pos + 1; pos++)
         {
-            auto &[pos, node] = *node_p;
             if (fds[pos].revents == POLLIN)
             {
-                int data = handleConnection(node);
+                auto new_node = handleConnection(nodes[pos]);
 
-                if (data > 0)
+                if (new_node)
                 {
-                    auto clnt = std::shared_ptr<Node>(new Client(data));
-                    addNode(clnt, 0); // TODO add nonblock support
+                    auto new_ptr = std::dynamic_pointer_cast<ClientTask>(new_node);
+                    if (new_ptr)
+                    {
+                        auto parent_ptr = std::dynamic_pointer_cast<Client>(nodes[pos]);
+                        new_ptr->attachData(th_pool, parent_ptr);
+                        rmNode(pos);
+                    }
+                    addNode(new_node, 1);
                 }
-                if (!node->is_active())
+                if (nodes[pos])
                 {
-                    node_p = rmNode(node_p);
+                    if (!nodes[pos]->is_active())
+                    {
+                        rmNode(pos);
+                    }
                 }
             }
         }
-        std::signal(SIGINT, EventLoop::handleSignal);
+        std::signal(SIGINT, EventLoop::handleSignal); // TODO called once
     }
+    th_pool->stop();
 }
 
 void EventLoop::handleSignal(int signal)
