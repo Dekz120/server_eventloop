@@ -21,48 +21,98 @@ std::shared_ptr<Node> Client::handleConnection()
     Node::closeConnection();
     return nullptr;
   }
-  std::shared_ptr<Node> res = nullptr;
+  std::shared_ptr<Node> res{nullptr};
   if (rcv > 0)
   {
-    request_field.append(buff, rcv);
-    auto p = request_field.find('\n');
-    if (p != std::string::npos)
+    bool gotReq = updateRequestField(buff, rcv);
+    if (gotReq)
     {
-
-      response = request_field.substr(0, p + 1);
+      parseCommand();
       res = sendData();
-      request_field.clear();
     }
   }
   return res;
 }
 
-std::shared_ptr<Node> Client::recognizeData() // Codes should be : OK or LONG_OPERATION IN TH_POOL
+bool Client::updateRequestField(const char *req, size_t len)
+{
+  request_field.append(req, len);
+  auto p = request_field.find('\n');
+  if (p != std::string::npos)
+  {
+    response = request_field.substr(0, p + 1);
+    if (p == request_field.size() - 1)
+      request_field.clear();
+    else
+      request_field = request_field.substr(p + 1, request_field.size() - p - 1);
+    return 1;
+  }
+  else
+    return 0;
+}
+
+void Client::parseCommand()
 {
   if (response.starts_with("time\n"))
   {
-    return Client::handleTime();
+    cmd.m_cmd = Command::Time;
+    cmd.m_arg.clear();
+    return;
   }
 
   if (response.starts_with("echo "))
   {
+    cmd.m_cmd = Command::Echo;
+    cmd.m_arg = response.substr(5, response.size() - 5);
+    return;
+  }
+
+  if (response.starts_with("compress "))
+  {
+    cmd.m_cmd = Command::Compress;
+    cmd.m_arg = response.substr(9, response.size() - 10);
+    return;
+  }
+
+  if (response.starts_with("decompress "))
+  {
+    cmd.m_cmd = Command::Decompress;
+    cmd.m_arg = response.substr((11), response.size() - 12);
+    return;
+  }
+
+  else
+  {
+    cmd.m_cmd = Command::NotExitsts;
+  }
+}
+
+std::shared_ptr<Node> Client::recognizeData() // Codes should be : OK or LONG_OPERATION IN TH_POOL
+{
+  if (cmd.m_cmd == Command::Time)
+  {
+    return Client::handleTime();
+  }
+
+  if (cmd.m_cmd == Command::Echo)
+  {
     return Client::handleEcho();
   }
 
-  if (response.starts_with("compress ") || response.starts_with("decompress "))
+  if (cmd.m_cmd == Command::Compress || cmd.m_cmd == Command::Decompress)
   {
     return Client::handleFileTask();
   }
   else
   {
     response = "Wrong request\n";
-    return 0;
   }
+  return nullptr;
 }
 
 std::shared_ptr<Node> Client::handleEcho()
 {
-  response = response.substr(5, request_field.size() - 5);
+  response = cmd.m_arg;
   return nullptr;
 }
 
@@ -77,8 +127,8 @@ std::shared_ptr<Node> Client::handleTime()
 std::shared_ptr<Node> Client::handleFileTask()
 {
   std::string dir_name;
-  if (response.starts_with("compress "))
-    dir_name = response.substr(9, response.size() - 10);
+  if (cmd.m_cmd == Command::Compress)
+    dir_name = cmd.m_arg;
   else
     dir_name = response.substr((11), response.size() - 12);
   const std::filesystem::path dir(dir_name);
@@ -88,7 +138,7 @@ std::shared_ptr<Node> Client::handleFileTask()
     return 0;
   }
   int fd = eventfd(0, EFD_CLOEXEC);
-  if (fd < 0) 
+  if (fd < 0)
   {
     return nullptr;
   }
@@ -103,6 +153,8 @@ std::shared_ptr<Node> Client::sendData()
     int s = send(getFd(), response.c_str(), response.size(), 0);
     if (s < 0)
       throw serverExcept("send()");
+    cmd.clear();
+    response.clear();
     return r;
   }
   else // functions requires a threadpool
