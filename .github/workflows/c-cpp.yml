@@ -17,5 +17,5 @@ jobs:
       run: make u_test
     - name: cmd_parser check
       run: cd ./test/cmd_parser && ./cmd_parser_ut
-    - name: cmd_parser check
-      run: cd ../.. && cd ./test/file_cmd && ./file_cmd_ut
+    - name: file_cmd check
+      run: cd ./test/file_cmd && ./file_cmd_ut
