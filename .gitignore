@@ -1,5 +1,6 @@
 *.o
 *.a
+/elooplib/*.o
 /bin
 .vscode
 bvnserver

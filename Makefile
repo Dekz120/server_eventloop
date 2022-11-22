@@ -19,6 +19,12 @@ eventloop.a: $(OBJECTS)
 elooplib/%.o: %.cpp
 	$(CXX)  -c $(CXXFLAGS) -I$(INCLUDES) $?
 
+u_test:
+	$(MAKE) -C ./test
+
+clean_all_tests:
+	$(MAKE) clean -C ./test
+
 clean:
 	rm -f elooplib/*.o *.o *.a bvnserver
 

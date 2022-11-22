@@ -55,51 +55,51 @@ void Client::parseCommand()
 {
   if (response.starts_with("time\n"))
   {
-    cmd.m_cmd = Command::Time;
-    cmd.m_arg.clear();
+    command.cmd = Command::Time;
+    command.arg.clear();
     return;
   }
 
   if (response.starts_with("echo "))
   {
-    cmd.m_cmd = Command::Echo;
-    cmd.m_arg = response.substr(5, response.size() - 5);
+    command.cmd = Command::Echo;
+    command.arg = response.substr(5, response.size() - 5);
     return;
   }
 
   if (response.starts_with("compress "))
   {
-    cmd.m_cmd = Command::Compress;
-    cmd.m_arg = response.substr(9, response.size() - 10);
+    command.cmd = Command::Compress;
+    command.arg = response.substr(9, response.size() - 10);
     return;
   }
 
   if (response.starts_with("decompress "))
   {
-    cmd.m_cmd = Command::Decompress;
-    cmd.m_arg = response.substr((11), response.size() - 12);
+    command.cmd = Command::Decompress;
+    command.arg = response.substr((11), response.size() - 12);
     return;
   }
 
   else
   {
-    cmd.m_cmd = Command::NotExitsts;
+    command.cmd = Command::Unknown;
   }
 }
 
 std::shared_ptr<Node> Client::recognizeData() // Codes should be : OK or LONG_OPERATION IN TH_POOL
 {
-  if (cmd.m_cmd == Command::Time)
+  if (command.cmd == Command::Time)
   {
     return Client::handleTime();
   }
 
-  if (cmd.m_cmd == Command::Echo)
+  if (command.cmd == Command::Echo)
   {
     return Client::handleEcho();
   }
 
-  if (cmd.m_cmd == Command::Compress || cmd.m_cmd == Command::Decompress)
+  if (command.cmd == Command::Compress || command.cmd == Command::Decompress)
   {
     return Client::handleFileTask();
   }
@@ -112,7 +112,7 @@ std::shared_ptr<Node> Client::recognizeData() // Codes should be : OK or LONG_OP
 
 std::shared_ptr<Node> Client::handleEcho()
 {
-  response = cmd.m_arg;
+  response = command.arg;
   return nullptr;
 }
 
@@ -127,8 +127,8 @@ std::shared_ptr<Node> Client::handleTime()
 std::shared_ptr<Node> Client::handleFileTask()
 {
   std::string dir_name;
-  if (cmd.m_cmd == Command::Compress)
-    dir_name = cmd.m_arg;
+  if (command.cmd == Command::Compress)
+    dir_name = command.arg;
   else
     dir_name = response.substr((11), response.size() - 12);
   const std::filesystem::path dir(dir_name);
@@ -153,7 +153,7 @@ std::shared_ptr<Node> Client::sendData()
     int s = send(getFd(), response.c_str(), response.size(), 0);
     if (s < 0)
       throw serverExcept("send()");
-    cmd.clear();
+    command.clear();
     response.clear();
     return r;
   }

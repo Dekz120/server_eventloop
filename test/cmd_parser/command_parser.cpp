@@ -12,17 +12,25 @@ Command commandTest(std::string &cmd)
   return client.getCommand();
 }
 
-TEST_CASE("Command parser test")
+TEST_CASE("Vaild command parser test")
 {
   std::vector<std::string> input{
-    "time\n",
-    "echo Hello, my name is Van. I'am performance artist\n",
-    "decompress dir/file\ntime\n",
-    "compress dir/file",
-    "cumpress dir/file\n",
-    "time \n",
-    "suctiooon",
+      "time\n",
+      "echo Hello, my name is Van. I'am performance artist\n",
+      "compress dir/file\n",
+      "decompress dir/file\ntime\n"};
+  for (auto &s : input)
+    CHECK(commandTest(s).cmd != Command::Unknown);
+}
+
+TEST_CASE("Invaild command parser test")
+{
+  std::vector<std::string> input{
+      "cumpress dir/file\n",
+      "time \n",
+      "suctiooon",
+      "compress dir/file",
   };
-  for(auto& s : input)
-    CHECK(commandTest(s).m_cmd == Command::NotExitsts);
+  for (auto &s : input)
+    CHECK(commandTest(s).cmd == Command::Unknown);
 }

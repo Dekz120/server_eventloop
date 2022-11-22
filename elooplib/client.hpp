@@ -16,13 +16,13 @@ struct Command
         Echo,
         Compress,
         Decompress,
-        NotExitsts
-    } m_cmd;
-    std::string m_arg;
+        Unknown
+    } cmd;
+    std::string arg;
     void clear()
     {
-        m_cmd = Command::NotExitsts;
-        m_arg.clear();
+        cmd = Command::Unknown;
+        arg.clear();
     };
 };
 class Client : public Node
@@ -30,7 +30,7 @@ class Client : public Node
 private:
     std::string request_field;
     std::string response;
-    Command cmd;
+    Command command;
 
 public:
     Client(int);
@@ -43,7 +43,7 @@ public:
     std::shared_ptr<Node> handleEcho();
     std::shared_ptr<Node> handleFileTask();
     void parseCommand();
-    Command getCommand() { return cmd; }
+    Command getCommand() { return command; }
 
     std::shared_ptr<Node> sendData();
     std::string getResponse();
