@@ -12,7 +12,7 @@ Command commandTest(std::string &cmd)
   return client.getCommand();
 }
 
-TEST_CASE("Vaild command parser test")
+TEST_CASE("Valid command parser test")
 {
   std::vector<std::string> input{
       "time\n",
@@ -23,7 +23,7 @@ TEST_CASE("Vaild command parser test")
     CHECK(commandTest(s).cmd != Command::Unknown);
 }
 
-TEST_CASE("Invaild command parser test")
+TEST_CASE("Invalid command parser test")
 {
   std::vector<std::string> input{
       "cumpress dir/file\n",
