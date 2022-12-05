@@ -1,0 +1,21 @@
+name: C/C++ CI (Unit test)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: make u_test check
+      run: make u_test
+    - name: cmd_parser check
+      run: cd ./test/cmd_parser && ./cmd_parser_ut
+    - name: file_cmd check
+      run: cd ./test/file_cmd && ./file_cmd_ut

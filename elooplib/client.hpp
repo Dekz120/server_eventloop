@@ -8,21 +8,42 @@
 #include "threadpool.hpp"
 #include "tp_tasks.hpp"
 
+struct Command
+{
+    enum
+    {
+        Time,
+        Echo,
+        Compress,
+        Decompress,
+        Unknown
+    } cmd;
+    std::string arg;
+    void clear()
+    {
+        cmd = Command::Unknown;
+        arg.clear();
+    };
+};
 class Client : public Node
 {
 private:
     std::string request_field;
     std::string response;
+    Command command;
 
 public:
     Client(int);
     Client(Client &&);
     std::shared_ptr<Node> handleConnection() override;
+    bool updateRequestField(const char *, size_t len);
     size_t getFd() override;
     std::shared_ptr<Node> recognizeData();
     std::shared_ptr<Node> handleTime();
     std::shared_ptr<Node> handleEcho();
     std::shared_ptr<Node> handleFileTask();
+    void parseCommand();
+    Command getCommand() { return command; }
 
     std::shared_ptr<Node> sendData();
     std::string getResponse();

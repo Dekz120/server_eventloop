@@ -41,8 +41,8 @@ int FileITask::handleFile(const std::string &src_name, const std::string &dst_na
   else
     res = -1;
 
-  using namespace std::chrono_literals;
-  std::this_thread::sleep_for(6000ms); // DEBUG
+  //using namespace std::chrono_literals; // DEBUG
+  //std::this_thread::sleep_for(6000ms); 
 
   std::filesystem::remove(src_name);
   flock(src->_fileno, LOCK_UN);
